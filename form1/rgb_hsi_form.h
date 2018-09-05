@@ -17,10 +17,12 @@
 #include "canny.h"
 #include "opencv2/imgproc/imgproc.hpp"
 
+#include <vector>
 
 using namespace std;
 using namespace cv;
-
+using std::vector;
+	
 #pragma once
 
 namespace form1 {
@@ -260,56 +262,140 @@ namespace form1 {
 				std::string final_path2 = msclr::interop::marshal_as<std::string>(final_path);
 				std::string h1_path = std::string("Image Processing/HUE__") + final_path2 + std::string(".jpg");
 				std::string s1_path = std::string("Image Processing/SAT__") + final_path2 + std::string(".jpg");
-						
-				imwrite(h1_path, h1); imwrite(s1_path, s1);					
+
+				imwrite(h1_path, h1); imwrite(s1_path, s1);
 				//imwrite("h1_final.jpg", h1);
 
 				delete img_Hue->Image;
 				img_Hue->Image = nullptr;
 				delete img_Saturation->Image;
 				img_Saturation->Image = nullptr;
-			
+
 				std::string open_hue = "C://Users/Acer User/Desktop/form1/form1" + h1_path;
-				std::string open_sat = "C://Users/Acer User/Desktop/form1/form1" + s1_path;							
+				std::string open_sat = "C://Users/Acer User/Desktop/form1/form1" + s1_path;
 				System::String^ open_hue2 = gcnew System::String(open_hue.c_str());
 				System::String^ open_sat2 = gcnew System::String(open_sat.c_str());
 
 				img_Hue->BackgroundImage = System::Drawing::Image::FromFile(open_hue2);
-				img_Saturation->BackgroundImage = System::Drawing::Image::FromFile(open_sat2);				
+				img_Saturation->BackgroundImage = System::Drawing::Image::FromFile(open_sat2);
 
-		#pragma region
+#pragma region
 
-			/* CANNY EDGE */
-			cv::Mat toCanny; //ORIGINAL IMG
-			cv::Mat imgGray;
-			cv::Mat Blur;
-			cv::Mat imgCanny; //OUTPUT
-		
-			//*** END OF CANNY EDGE ***//
-			toCanny = cv::imread(img_addr);            // open image
+				/* CANNY EDGE */
+				cv::Mat toCanny; //ORIGINAL IMG
+				cv::Mat imgGray;
+				cv::Mat Blur;
+				cv::Mat imgCanny; //OUTPUT
 
-			cv::cvtColor(toCanny, imgGray, CV_BGR2GRAY);        // convert to grayscale
+				//*** END OF CANNY EDGE ***//
+				toCanny = cv::imread(img_addr);            // open image
 
-			cv::Canny(Blur,            // input image
-				imgCanny,                    // output image
-				100,                        // low threshold
-				200);                        // high threshold
+				cv::cvtColor(toCanny, imgGray, CV_BGR2GRAY);        // convert to grayscale
+
+				cv::Canny(Blur,            // input image
+					imgCanny,                    // output image
+					100,                        // low threshold
+					200);                        // high threshold
 
 
-											 // Declare windows
-											 // Note: you can use CV_WINDOW_NORMAL which allows resizing the window
-											 // or CV_WINDOW_AUTOSIZE for a fixed size window matching the resolution of the image
-											 // CV_WINDOW_AUTOSIZE is the default
-			cv::namedWindow("toCanny", CV_WINDOW_AUTOSIZE);
-			cv::namedWindow("imgCanny", CV_WINDOW_AUTOSIZE);
+												 // Declare windows
+												 // Note: you can use CV_WINDOW_NORMAL which allows resizing the window
+												 // or CV_WINDOW_AUTOSIZE for a fixed size window matching the resolution of the image
+												 // CV_WINDOW_AUTOSIZE is the default
+				cv::namedWindow("toCanny", CV_WINDOW_AUTOSIZE);
+				cv::namedWindow("imgCanny", CV_WINDOW_AUTOSIZE);
 
-			//Show windows
-			cv::imshow("toCanny", toCanny);
-			cv::imshow("imgCanny", imgCanny);
+				//Show windows
+				cv::imshow("toCanny", toCanny);
+				cv::imshow("imgCanny", imgCanny);
 
-			cv::waitKey(0);                    // hold windows open until user presses a key
+				cv::waitKey(0);                    // hold windows open until user presses a key
 
-		; }
+				// Shape detect
+				std::vector<std::vector<cv::Point>> contours;
+				std::vector<cv::Point> approx;
+
+				cv::findContours(imgCanny.clone(), contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE);
+
+				for (int i = 0; i < contours.size(); i++)
+				{
+					// Approximate contour with accuracy proportional
+					// to the contour perimeter
+					cv::approxPolyDP(cv::Mat(contours[i]), approx, cv::arcLength(cv::Mat(contours[i]), true)*0.02, true);
+
+					// Skip small or non-convex objects
+					if (std::fabs(cv::contourArea(contours[i])) < 100 || !cv::isContourConvex(approx))
+						continue;
+
+					if (approx.size() == 3)
+					{
+						//setLabel(dst, "TRI", contours[i]);    // Triangles
+					}
+					else if (approx.size() >= 4 && approx.size() <= 6)
+					{
+						// Number of vertices of polygonal curve
+						int vtc = approx.size();
+
+						// Get the cosines of all corners
+						std::vector<float> cos;
+						for (int j = 2; j < vtc + 1; j++) {
+							cv::Point pt1 = approx[j%vtc];
+							cv::Point pt2 = approx[j - 2];
+							cv::Point pt0 = approx[j - 1];
+
+							double dx1 = pt1.x - pt0.x;
+							double dy1 = pt1.y - pt0.y;
+							double dx2 = pt2.x - pt0.x;
+							double dy2 = pt2.y - pt0.y;
+							double answer = (dx1*dx2 + dy1*dy2) / sqrt((dx1*dx1 + dy1*dy1)*(dx2*dx2 + dy2*dy2) + 1e-10);
+							cos.push_back(answer);
+						}
+
+						// Sort ascending the cosine values
+						std::sort(cos.begin(), cos.end());
+
+						// Get the lowest and the highest cosine
+						double mincos = cos.front();
+						double maxcos = cos.back();
+
+						// Use the degrees obtained above and the number of vertices
+						// to determine the shape of the contour
+						if (vtc == 4) {
+							//setLabel(dst, "RECT", contours[i]);
+						}
+						else if (vtc == 5) {
+							//setLabel(dst, "PENTA", contours[i]);
+						}
+						else if (vtc == 6) {
+							//setLabel(dst, "HEXA", contours[i]);
+						}
+						else
+						{
+							// Detect and label circles
+							double area = cv::contourArea(contours[i]);
+							cv::Rect r = cv::boundingRect(contours[i]);
+							int radius = r.width / 2;
+
+							if (std::abs(1 - ((double)r.width / r.height)) <= 0.2 &&
+								std::abs(1 - (area / (CV_PI * (radius*radius)))) <= 0.2) {
+								//setLabel(dst, "CIR", contours[i]);
+							}
+						}
+
+					}
+						// Shape Size			
+						/*
+						cv::Mat size_width;
+						cv::Mat size_height;
+
+						size_width = imgCanny.size().width;
+						size_height = imgCanny.size().height;
+						*/
+
+						;
+					}
+				}
+			}
 			else {
 				System::String^ error = gcnew System::String("Please select another file.");
 				MessageBox::Show(error);
@@ -317,7 +403,5 @@ namespace form1 {
 			}		
 		MessageBox::Show("Done");
 		}
+	};
 	}
-
-};
-} 
