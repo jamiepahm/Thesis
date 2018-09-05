@@ -177,6 +177,10 @@ namespace form1 {
 	#pragma endregion
 
 	private: System::Void btnOpen_Click(System::Object^  sender, System::EventArgs^  e) {
+		System::String^ message = "";
+		System::String^ final_path = "";
+		System::String^ img_change = "";
+
 		rgb_hsi_form::openFile->InitialDirectory = "C://Users/Acer User/Pictures/Inspirations";
 		openFile->Filter = "JPG (*.jpg)|*.jpg|All files (*.*)|*.*";
 		openFile->FilterIndex = 2;
